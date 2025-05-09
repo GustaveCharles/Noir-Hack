@@ -43,9 +43,11 @@ fn main(
     pubkey_modulus_limbs: pub [u128; 18],
     redc_params_limbs: [u128; 18],
     signature_limbs: [u128; 18],
+    // Inclusion Zuitzerland tree parameters
     merkle_root:           pub Field,
     proof_siblings:        [Field; TREE_DEPTH],  // sibling hashes
     proof_index:           Field,                // leaf index in the tree
+    // PCD Merkle tree parameters
     pcd_hash: pub Field,             // hash of the pcd that we want to provide with our auth
     pcd_merkle_root: pub Field,      // current root of the PCD Merkle tree
     pcd_proof_siblings: [Field; PCD_TREE_DEPTH], // sibling hashes for PCD tree
