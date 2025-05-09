@@ -33,6 +33,10 @@ global LEAF_LIMBS:  u32 = 8;
 // Merkle parameters:
 global TREE_DEPTH:  u32 = 8;   // e.g. a 2^8-leaf tree //256 participants max at Zuitzerland
 
+// Constants for the PCD Merkle Tree
+global PCD_TREE_DEPTH: u32 = 10;  // Allowing for more PCDs than participants
+
+
 fn main(
     data: BoundedVec<u8, MAX_DATA_LENGTH>,
     base64_decode_offset: u32,
@@ -42,6 +46,11 @@ fn main(
     merkle_root:           pub Field,
     proof_siblings:        [Field; TREE_DEPTH],  // sibling hashes
     proof_index:           Field,                // leaf index in the tree
+    pcd_hash: pub Field,             // hash of the pcd that we want to provide with our auth
+    pcd_merkle_root: pub Field,      // current root of the PCD Merkle tree
+    pcd_proof_siblings: [Field; PCD_TREE_DEPTH], // sibling hashes for PCD tree
+    pcd_proof_index: Field,          // index where we want to insert/verify the PCD
+    is_adding_pcd: bool              // flag to indicate whether we're adding or just verifying
 ) {
     let jwt = JWT::init(
         data,
@@ -55,18 +64,28 @@ fn main(
 
     // Verify `iss` claim value is "test"
     //TODO: Is the below line needed?
-    //jwt.assert_claim_string("iss".as_bytes(), BoundedVec::<u8, 4>::from_array("test".as_bytes()));
+    //jwt.assert_claim_string("iss".as_bytes(),  BoundedVec::<u8, 15>::from_array("http://test.com".as_bytes()));
 
     let email: BoundedVec<u8, MAX_EMAIL_LENGTH> = jwt.get_claim_string("email".as_bytes());
     let email_fields: [Field; M] = boundedvec_to_fields(email);
     // 2) Poseidon-hash those limbs down to one Field
     let leaf: Field = hash(email_fields, LEAF_LIMBS);
     // 3) Verify the Merkle proof
-    belongs_to_merkle_tree(merkle_root, poseidon_hasher, leaf, proof_index, proof_siblings)
+    belongs_to_merkle_tree(merkle_root, leaf, proof_index, proof_siblings);
+
+    // Handle the PCD Merkle tree operations
+    if is_adding_pcd {
+        // Add the PCD hash to the PCD Merkle tree and get the new root
+        let new_pcd_root = add_pcd_to_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
+        assert(new_pcd_root != pcd_merkle_root);
+    } else {
+        // Verify that the PCD exists in the tree
+        verify_pcd_in_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
+    }
 }
 
 //-----------------------------------------------------------------------------
-// 1) Your byte to field conversion (truncates the 32nd byte)
+// Byte to field conversion (truncates the 32nd byte)
 // from here: https://github.com/noir-lang/noir/blob/5d782f020f6aec6aaa8a445c3a6a5fb9b275e3c6/test_programs/execution_success/ram_blowup_regression/src/main.nr
 //-----------------------------------------------------------------------------
 pub fn field_from_bytes_32_trunc(bytes32: [u8; 32]) -> Field {
@@ -87,7 +106,7 @@ pub fn field_from_bytes_32_trunc(bytes32: [u8; 32]) -> Field {
 }
 
 //-----------------------------------------------------------------------------
-// 2) Chop a BoundedVec<u8,N> into M chunks of 32-bytes and convert each
+// Chop a BoundedVec<u8,N> into M chunks of 32-bytes and convert each
 //-----------------------------------------------------------------------------
 fn boundedvec_to_fields(vec: BoundedVec<u8, MAX_EMAIL_LENGTH>) -> [Field; M] {
     let mut fields: [Field; M] = [0; M];
@@ -105,14 +124,42 @@ fn boundedvec_to_fields(vec: BoundedVec<u8, MAX_EMAIL_LENGTH>) -> [Field; M] {
     fields
 }
 
-fn belongs_to_merkle_tree(root: Field, hasher : fn([Field; 2]) -> Field, leaf : Field, indexes : Field, hash_path: [Field; TREE_DEPTH]) {
-    let mut mt = MerkleTree::from(root, hasher);
+fn belongs_to_merkle_tree(root: Field, leaf : Field, indexes : Field, hash_path: [Field; TREE_DEPTH]) {
+    let mut mt = MerkleTree::from(root, poseidon_hasher);
     mt.membership(leaf, indexes, hash_path);
 }
 
 // Create a hasher function that can be used with MerkleTree
 pub fn poseidon_hasher(inputs: [Field; 2]) -> Field {
     hash(inputs,2)
+}
+
+// Function to add a PCD hash to the PCD Merkle Tree
+fn add_pcd_to_merkle_tree(
+    pcd_hash: Field,
+    pcd_merkle_root: Field,
+    proof_siblings: [Field; PCD_TREE_DEPTH],
+    proof_index: Field
+) -> Field {
+    // Create a Merkle Tree instance with the current root
+    let mut pcd_tree = MerkleTree::from(pcd_merkle_root, poseidon_hasher);
+    
+    // Add the PCD hash to the tree and get the updated root
+    pcd_tree.add(pcd_hash, proof_index, proof_siblings);
+    
+    // Return the new root after adding the PCD hash
+    pcd_tree.root
+}
+
+// Function to verify that a PCD hash exists in the PCD Merkle Tree
+fn verify_pcd_in_merkle_tree(
+    pcd_hash: Field,
+    pcd_merkle_root: Field,
+    hash_path: [Field; PCD_TREE_DEPTH],
+    proof_index: Field
+) {
+    let pcd_tree = MerkleTree::from(pcd_merkle_root, poseidon_hasher);
+    pcd_tree.membership(pcd_hash, proof_index, hash_path);
 }
 
 #[test]
@@ -128,7 +175,7 @@ fn test_merkle_membership() {
     let mut mt1 = MerkleTree::from(root,poseidon_hasher);
     
     // Test the membership function
-    belongs_to_merkle_tree(root, poseidon_hasher, leaf, indexes, hash_path);
+    belongs_to_merkle_tree(root, leaf, indexes, hash_path);
 }
 
 #[test(should_fail)]
@@ -145,7 +192,7 @@ fn test_merkle_membership_wrong_leaf() {
 
     // Negative test case
     let wrong_leaf = 43;
-    belongs_to_merkle_tree(root, poseidon_hasher, wrong_leaf, indexes, hash_path);
+    belongs_to_merkle_tree(root, wrong_leaf, indexes, hash_path);
 }
 
 #[test]
@@ -238,12 +285,19 @@ fn test_main() {
     // 3) build tree and get the real root
     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
     let mut mt1 = MerkleTree::from(root,poseidon_hasher);
-    main(data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs, root, hash_path, indexes)
+    //main(data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs, root, hash_path, indexes)
 
 }
 
-#[test]
-fn test_get_claim_string() {
+
+pub fn get_test_data() -> (
+    [u128; 18],  // pubkey_modulus_limbs
+    [u128; 18],  // redc_params_limbs
+    [u128; 18],  // signature_limbs
+    BoundedVec<u8, 512>, // data
+    u32,          // base64_decode_offset
+    BoundedVec<u8, 64> // expected_email
+) {
     let pubkey_modulus_limbs = [
         484791102317025465533947056954494751,
         689128460766062759582134715581990032,
@@ -320,18 +374,107 @@ fn test_get_claim_string() {
         52, 99, 67, 73, 54, 77, 84, 99, 53, 79, 84, 107, 53, 79, 84, 107, 53, 79, 88, 48,
     ]);
     let base64_decode_offset = 37;
+    let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
 
-    let jwt: JWT<512> = JWT::init(
-        data,
-        base64_decode_offset,
+    (
         pubkey_modulus_limbs,
         redc_params_limbs,
         signature_limbs,
-    );
-
-    jwt.verify();
-
-    let email: BoundedVec<u8, 64> = jwt.get_claim_string("email".as_bytes());
-    let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
-    assert(email == expected_email);
+        data,
+        base64_decode_offset,
+        expected_email,
+    )
 }
+
+#[test]
+fn test_main_with_pcd_verification() {
+    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
+
+    // Test data for email verification
+    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+    let leaf: Field = hash(email_fields, LEAF_LIMBS);
+    let indexes = 0;
+    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+
+    // Test data for PCD verification
+    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+    let pcd_proof_index = 0;
+    let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
+    let pcd_merkle_root: Field = MerkleTree::new(poseidon_hasher).calculate_root(pcd_hash, pcd_proof_index, pcd_proof_siblings);
+
+    // Test verification mode (is_adding_pcd = false)
+    main(
+        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+        root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
+    );
+}
+
+#[test]
+fn test_main_with_pcd_addition() {
+    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
+
+    // Test data for email verification
+    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+    let leaf: Field = hash(email_fields, LEAF_LIMBS);
+    let indexes = 0;
+    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+
+    // Test data for PCD addition
+    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+    let pcd_proof_index = 0;
+    let pcd_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
+    let (pcd_old_root, pcd_new_root) = MerkleTree::new(poseidon_hasher).calculate_two_roots(pcd_hash, pcd_proof_index, pcd_siblings);
+    // Test addition mode (is_adding_pcd = true)
+    main(
+        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+        root, hash_path, indexes, pcd_hash, pcd_old_root, pcd_siblings, pcd_proof_index, true
+    );
+}
+
+#[test(should_fail)]
+fn test_main_with_invalid_pcd() {
+    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
+
+    // Test data for email verification
+    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+    let leaf: Field = hash(email_fields, LEAF_LIMBS);
+    let indexes = 0;
+    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+
+    // Test data for PCD verification with invalid PCD
+    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+
+    let different_pcd: BoundedVec<u8, 64> = BoundedVec::from_array("different_pcd".as_bytes());
+    let different_pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+    let different_pcd_hash = hash(different_pcd_fields, LEAF_LIMBS);
+    let pcd_merkle_root = hash([different_pcd_hash, different_pcd_hash], 2);
+    let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [0; PCD_TREE_DEPTH];
+    let pcd_proof_index = 0;
+
+    // This should fail because our pcd_hash doesn't match what's in the tree
+    main(
+        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+        root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
+    );
+}
+
+// #[test]
+// fn test_other_inputs(){
+//     //https://github.com/shield-labs/zklogin/blob/main/packages/contracts/noir/jwt/src/lib.nr
+//     global pubkey_limbs: [Field; 18] = [0x9d9b7ab520532396758488b2100155, 0x87ff0f733247ea1ae377d26bdd60aa, 0x55e1805ec2babe74ebadb5de3c29a7, 0x4131e289b5519e562dff8935a669e2, 0xe974f2f0179abc0cc837efb26a9d5d, 0x72f158dfb2a2ba0fd881d8742426ec, 0x7e56e9182ef83caea0a45cfdaba45a, 0xc2b9b23f6684f0442257dbb8a37291, 0xfc0ecae4fe9f8be5c52a91edd59db2, 0x3ba9bd0376ade89881c7bafa2b36de, 0x3548bec7032b97739300f7fd72769b, 0x6a5b4b975ccf938c5e63ee41d57c7c, 0x4fabc9dbb6a9157f91a87adaff6e66, 0x303d705edf9cae022cd91f57f332b6, 0x1834cc2b65d9d2cab6dd210ba58cad, 0x43b9c3ca0df606d243d4c442794829, 0x5239e9f174adc5871d580714b1eb98, 0xe1];
+//     global pubkey_redc_limbs: [Field; 18] = [0x1e7578875458139006e47aac5c17fb, 0x249a5affa65fe288cb0df8ab6548be, 0xc29ec9b115f3132ff5fb71e744fba3, 0xbde4d1e1b2e894dd482277dc14aba5, 0x675f382edc2e53fabb2c785f0dd7e8, 0x8af86434e50f50ddfc9b46ce2c8990, 0xbaf8f36a4caec8a61d14be456599d3, 0x4ac14c9865afb8da5ab36b76e6d651, 0x2be72e03504024bbc777e0a1e9d16d, 0x249a0c4d673705ab5ad1757a225fea, 0x0300712f5005899fffeb1289f9ef4b, 0x73eb759f585e597acb40bfbf59efed, 0xe070a169f35358c7ead1df56d02d4b, 0x5657e0c005b6bca107abd9024b4dd1, 0xe6da2103c7938911ca44a5e641c541, 0xc98e9e1235394e0eb2b87143fd42c3, 0xdb1c76abaf095069edf0ea5248ef95, 0x0122];
+//     global signature_limbs: [Field; 18] = [ 0xabf49b8204494364afed7815aae9ba, 0x8888b30c7c97cdc0db80766909eba6, 0x5bd07a0786375af02d5f8e9cf9e0bb, 0xb5b1f36ae1cd61952109a814129827, 0xbd011faeecf1eb1ea383e81e1b424e, 0xdb819268100bedf9bb00ceae0c074a, 0x0eaeb846fc824d344bba37468c316d, 0x9123576355f3f5e896ea786a86ce8a, 0x1b9d1c8c412149b3c82e6498a732a9, 0x3d8cbd4f7856947f02ff19e8c478d0, 0x1d3f1389db68a6d6168d9e8104e742, 0x134d7ca6427322a9f62176146be4dc, 0x072d9968d8070f0612a7a781eb3cd0, 0x29a01c7d38758d3cb1ab0a45f9f3e7, 0xa92f67bad1f1995d9e72c23bfa469d, 0x9139299fb1abcc7c45a0305a92a454, 0x6f7998d04ba5abf002a11808d0de0e, 0x42 ];
+//     global header_base64url: [u8; 102] = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImE1MGY2ZTcwZWY0YjU0OGE1ZmQ5MTQyZWVjZDFmYjhmNTRkY2U5ZWUiLCJ0eXAiOiJKV1QifQ".as_bytes();
+//     global payload_base64url: [u8; 774] = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI2OTgxMDk0NzQ4MDUtbnZmZzloaDMxa2ptYjZtbW41MWQ0b2lvbWJncjNzM3YuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI2OTgxMDk0NzQ4MDUtbnZmZzloaDMxa2ptYjZtbW41MWQ0b2lvbWJncjNzM3YuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTYzMjIyNTIzMjA3NTUyMTgyMjIiLCJlbWFpbCI6ImJhc2UuZW1haWwud2FsbGV0QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJhdF9oYXNoIjoiVzZWN2NmdURjVVhNeTNqWHNpbmRTZyIsIm5vbmNlIjoiZDhkQTZCRjI2OTY0YUY5RDdlRWQ5ZTAzRTUzNDE1RDM3YUE5NjA0NSIsIm5hbWUiOiJUZXN0IEdtYWlsIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pVa3FXYVpVMUtxX1RKMU5tak9XWUtBZ1VSc2txUl9IX21FbXVIQmVGRklCSHhWUT1zOTYtYyIsImdpdmVuX25hbWUiOiJUZXN0IiwiZmFtaWx5X25hbWUiOiJHbWFpbCIsImlhdCI6MTcyOTIwNDM2NiwiZXhwIjoxNzI5MjA3OTY2fQ".as_bytes();
+//     global payload_json_padded: [u8; 580] = "{\"iss\":\"https://accounts.google.com\",\"azp\":\"698109474805-nvfg9hh31kjmb6mmn51d4oiombgr3s3v.apps.googleusercontent.com\",\"aud\":\"698109474805-nvfg9hh31kjmb6mmn51d4oiombgr3s3v.apps.googleusercontent.com\",\"sub\":\"116322252320755218222\",\"email\":\"base.email.wallet@gmail.com\",\"email_verified\":true,\"at_hash\":\"W6V7cfuDcUXMy3jXsindSg\",\"nonce\":\"d8dA6BF26964aF9D7eEd9e03E53415D37aA96045\",\"name\":\"Test Gmail\",\"picture\":\"https://lh3.googleusercontent.com/a/ACg8ocJUkqWaZU1Kq_TJ1NmjOWYKAgURskqR_H_mEmuHBeFFIBHxVQ=s96-c\",\"given_name\":\"Test\",\"family_name\":\"Gmail\",\"iat\":1729204366,\"exp\":1729207966}".as_bytes();
+
+// }
