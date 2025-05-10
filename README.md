@@ -57,6 +57,43 @@ All in **one single zkSNARK proof**, submitted to a centralized verifier.
 
 Join us in making private, unlinkable, verifiable identity as easy as “login with email”—but so much more powerful.  
 
+---
+
+## Prerequisites
+
+- Node.js (v18 or higher)
+- npm or yarn
+- Google OAuth2 credentials
+
+## Quick Start
+
+1. Clone the repository:
+```bash
+git clone https://github.com/GustavesCharles/Noir-Hack.git
+cd zk-jwt
+```
+
+2. Install dependencies:
+```bash
+# Install server dependencies
+cd server
+npm install
+
+# Install client dependencies
+cd ../client
+npm install
+```
+3. Start the development servers:
+
+```bash
+# Start the server (from server directory)
+npm run dev
+
+# Start the client (from client directory)
+npm run dev
+```
+
+---
 
 # App Architecture Overview
 
