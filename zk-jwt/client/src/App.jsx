@@ -9,6 +9,7 @@ import AuthCallback from './pages/AuthCallback';
 import { verifyIdToken } from './utils/auth';
 import ProofCreator from './pages/ProofCreator';
 import Home from './pages/Home';
+import Apps from './pages/Apps';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
@@ -23,7 +24,7 @@ function App() {
     setIsAuthenticated(verifyIdToken(idToken) !== null);
   }, [location]);
 
-  const isPublicPage = location.pathname === '/' || location.pathname === '/login';
+  const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/create-proof';
 
   return (
     <GoogleOAuthProvider clientId="604604729243-ghkjdvrngdbg6558jvki2maggsjtlfvh.apps.googleusercontent.com">
@@ -33,7 +34,7 @@ function App() {
         )}
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/jwt" />} />
+          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/create-proof" />} />
           <Route 
             path="/auth/callback" 
             element={
@@ -63,6 +64,14 @@ function App() {
             element={
               <Container maxWidth={false} disableGutters sx={{ mt: 8 }}>
                 {isAuthenticated ? <ProofCreator /> : <Navigate to="/login" />}
+              </Container>
+            } 
+          />
+          <Route 
+            path="/apps" 
+            element={
+              <Container maxWidth={false} disableGutters>
+                {isAuthenticated ? <Apps /> : <Navigate to="/login" />}
               </Container>
             } 
           />

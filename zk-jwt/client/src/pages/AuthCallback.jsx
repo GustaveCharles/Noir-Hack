@@ -21,7 +21,7 @@ function AuthCallback({ setIsAuthenticated }) {
         // Handle the Google callback and wait for it to complete
         await handleGoogleCallback(idToken);
         setIsAuthenticated(true);
-        navigate('/jwt', { replace: true });
+        navigate('/create-proof', { replace: true });
       } catch (error) {
         console.error('Error in auth callback:', error);
         setIsAuthenticated(false);

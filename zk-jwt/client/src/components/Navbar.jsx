@@ -84,6 +84,19 @@ function Navbar({ isAuthenticated, setIsAuthenticated }) {
               </Button>
               <Button 
                 color="inherit" 
+                component={Link} 
+                to="/apps"
+                sx={{ 
+                  color: '#CBE4DE',
+                  '&:hover': { 
+                    backgroundColor: 'rgba(14, 131, 136, 0.2)' 
+                  }
+                }}
+              >
+                Apps
+              </Button>
+              <Button 
+                color="inherit" 
                 onClick={handleLogout}
                 sx={{ 
                   color: '#CBE4DE',

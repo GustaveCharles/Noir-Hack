@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
   const [nonce] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Load Google Identity Services Script
@@ -37,19 +39,12 @@ function Login() {
   return (
     <Box
       sx={{
-        height: '100vh',
-        width: '100vw',
-        margin: 0,
-        padding: 0,
-        position: 'fixed',
-        top: 0,
-        left: 0,
+        minHeight: '100vh',
         background: 'radial-gradient(circle at center, #2C3333 0%, #3a4242 50%, #4d5757 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: 'white',
-        overflow: 'hidden',
       }}
     >
       <Box
@@ -57,7 +52,7 @@ function Login() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 6,
+          gap: 4,
           maxWidth: '400px',
           width: '100%',
           textAlign: 'center',
@@ -69,14 +64,14 @@ function Login() {
           src="/logo/logo.svg"
           alt="Zauth Logo"
           sx={{
-            width: '100px',
-            height: '100px',
+            width: '120px',
+            height: '120px',
             filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 0.1))',
           }}
         />
-        
+
         <Typography
-          variant="h3"
+          variant="h4"
           component="h1"
           sx={{
             fontWeight: 700,
@@ -84,49 +79,41 @@ function Login() {
             textTransform: 'uppercase',
             color: '#fff',
             textShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
           }}
         >
-          Sign In
+          Welcome to Zauth
         </Typography>
 
         <Typography
-          variant="h6"
+          variant="subtitle1"
           sx={{
             opacity: 0.8,
-            maxWidth: '300px',
+            maxWidth: '400px',
             lineHeight: 1.6,
             fontWeight: 400,
           }}
         >
-          Authenticate securely using your Google account
+          Sign in with your Google account to create your Zuitzpass proof
         </Typography>
 
-        {/* Modern Google Sign-In Button */}
-        <div 
-          id="g_id_onload"
-          data-client_id="604604729243-ghkjdvrngdbg6558jvki2maggsjtlfvh.apps.googleusercontent.com"
-          data-context="signin"
-          data-ux_mode="redirect"
-          data-login_uri="http://localhost:5173/auth/callback"
-          data-auto_prompt="false"
-        />
-        <div
-          className="g_id_signin"
-          data-type="standard"
-          data-shape="rectangular"
-          data-theme="outline"
-          data-text="signin_with"
-          data-size="large"
-          data-logo_alignment="left"
-          data-width="280"
+        <Button
+          variant="contained"
           onClick={handleGoogleLogin}
-          style={{ 
-            cursor: 'pointer',
-            transform: 'scale(1.2)',
-            marginTop: '20px',
+          sx={{
+            backgroundColor: '#0E8388',
+            color: '#CBE4DE',
+            padding: '12px 40px',
+            fontSize: '1.1rem',
+            borderRadius: '50px',
+            textTransform: 'none',
+            '&:hover': {
+              backgroundColor: '#2E4F4F',
+            },
+            transition: 'all 0.3s ease',
           }}
-        />
+        >
+          Sign in with Google
+        </Button>
       </Box>
     </Box>
   );

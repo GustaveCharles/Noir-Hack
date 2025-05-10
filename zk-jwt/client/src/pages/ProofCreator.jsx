@@ -1,20 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Card, CardContent, Typography, TextField, Alert, Stack } from '@mui/material';
+import { Box, Typography, CircularProgress } from '@mui/material';
 import { UltraHonkBackend } from '@aztec/bb.js';
 import { Noir } from '@noir-lang/noir_js';
 import { generateInputs } from '../utils/jwtProof';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 let noir = null;
 let backend = null;
 
 function ProofCreator() {
+  const navigate = useNavigate();
   const jwt = localStorage.getItem('idToken');
   const [inputs, setInputs] = useState({
-    merkle_root: '',
-    proof_siblings: '',
-    proof_index: '',
+    merkle_root: '0x27abfccde30aa73888f59d30c1b58375fc250bb49b10c52049c1828f4fd83a6d',
+    proof_siblings: JSON.stringify([
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ]),
+    proof_index: "0",
   });
   const [proofVerify, setProofVerify] = useState(null);
   const [publicInputs, setPublicInputs] = useState(null);
@@ -24,6 +35,8 @@ function ProofCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
+  const [status, setStatus] = useState('initializing');
+  const [userEmail, setUserEmail] = useState('');
 
   // Load circuit on mount
   useEffect(() => {
@@ -38,9 +51,11 @@ function ProofCreator() {
         
         setCircuitLoaded(true);
         console.log('Circuit loaded successfully');
+        setStatus('ready');
       } catch (err) {
         console.error('Error loading circuit:', err);
         setError('Error loading circuit: ' + err.message);
+        setStatus('error');
       }
     };
 
@@ -59,19 +74,40 @@ function ProofCreator() {
         const key = jwks.keys.find(k => k.kid === header.kid);
         if (!key) throw new Error('Google public key not found for JWT');
         setPubkey(key);
+        
+        // Set user email from JWT
+        const decoded = jwtDecode(jwt);
+        setUserEmail(decoded.email);
       } catch (err) {
         console.error('Error fetching Google public key:', err);
         setError('Error fetching Google public key: ' + err.message);
+        setStatus('error');
       }
     };
 
     fetchPubkey();
   }, [jwt]);
 
+  // Auto-generate and verify proof when everything is ready
+  useEffect(() => {
+    if (status === 'ready' && circuitLoaded && pubkey && jwt) {
+      handleGenerateProof();
+    }
+  }, [status, circuitLoaded, pubkey, jwt]);
+
+  // Handle successful verification and redirect
+  useEffect(() => {
+    if (verificationResult?.isValid) {
+      const timer = setTimeout(() => {
+        navigate('/apps', { replace: true });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [verificationResult, navigate]);
+
   const handleChange = (e) => {
     setInputs({ ...inputs, [e.target.name]: e.target.value });
   };
-
 
   const handleGenerateProof = async () => {
     setError('');
@@ -79,6 +115,7 @@ function ProofCreator() {
     setPublicInputs(null);
     setVerificationResult(null);
     setIsGenerating(true);
+    setStatus('generating');
 
     try {
       if (!noir || !backend) {
@@ -101,12 +138,6 @@ function ProofCreator() {
         proof_index: Number(inputs.proof_index),
       });
 
-      // Log what we get from generateInputs
-      console.log('Circuit inputs from generateInputs:', {
-        pubkey_limbs: circuitInputs.pubkey_modulus_limbs,
-        merkle_root: inputs.merkle_root
-      });
-
       const { witness } = await noir.execute(circuitInputs);
       console.log('Witness generated');
 
@@ -114,38 +145,42 @@ function ProofCreator() {
       const proofVerify = proof.proof
       const publicInputs = proof.publicInputs
 
-
       setProofVerify(proofVerify);
       setPublicInputs(publicInputs);
+      setStatus('verifying');
+      
+      // Automatically verify the proof
+      await handleVerifyProof(proofVerify, publicInputs);
 
     } catch (err) {
       console.error('Proof generation failed:', err);
       setError('Proof generation failed: ' + err.message);
+      setStatus('error');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleVerifyProof = async () => {
+  const handleVerifyProof = async (proofToVerify = proofVerify, inputsToVerify = publicInputs) => {
     setError('');
     setVerificationResult(null);
     setIsVerifying(true);
 
     try {
-      if (!proofVerify || !publicInputs) {
+      if (!proofToVerify || !inputsToVerify) {
         throw new Error('No proof to verify. Please generate a proof first.');
       }
 
-      console.log('Proof verify:', proofVerify);
       const response = await axios.post('http://localhost:4000/api/verify-jwt-proof', {
-        proofVerify: JSON.stringify(Array.from(proofVerify)),
-        publicInputs: JSON.stringify(publicInputs, null, 2)
+        proofVerify: JSON.stringify(Array.from(proofToVerify)),
+        publicInputs: JSON.stringify(inputsToVerify, null, 2)
       });
 
       setVerificationResult({
         isValid: response.data.verified,
         message: response.data.message
       });
+      setStatus('complete');
     } catch (err) {
       console.error('Verification failed:', err);
       if (err.response?.data) {
@@ -153,126 +188,142 @@ function ProofCreator() {
       }
       const errorMessage = err.response?.data?.message || err.message;
       setError(`Verification failed: ${errorMessage}`);
+      setStatus('error');
     } finally {
       setIsVerifying(false);
     }
   };
 
+  const getStatusMessage = () => {
+    switch (status) {
+      case 'initializing':
+        return 'Initializing proof system...';
+      case 'ready':
+        return 'Ready to generate proof...';
+      case 'generating':
+        return 'Generating proof for your JWT...';
+      case 'verifying':
+        return 'Verifying proof with the server...';
+      case 'complete':
+        return 'Proof process completed! Redirecting to home...';
+      case 'error':
+        return 'An error occurred during the process.';
+      default:
+        return '';
+    }
+  };
+
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', mt: 8 }}>
-      <Card>
-        <CardContent>
-          <Typography variant="h5" gutterBottom>
-            Create and Verify Zuitzpass Proof
+    <Box
+      sx={{
+        height: '100vh',
+        width: '100vw',
+        margin: 0,
+        padding: 0,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        background: 'radial-gradient(circle at center, #2C3333 0%, #3a4242 50%, #4d5757 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'white',
+        overflow: 'hidden',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
+          maxWidth: '600px',
+          width: '100%',
+          textAlign: 'center',
+          p: 3,
+        }}
+      >
+        <Box
+          component="img"
+          src="/logo/logo.svg"
+          alt="Zauth Logo"
+          sx={{
+            width: '100px',
+            height: '100px',
+            filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 0.1))',
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+          }}
+        />
+
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: '#fff',
+            textShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          }}
+        >
+          Creating Zuitzpass Proof
+        </Typography>
+
+        {userEmail && (
+          <Typography
+            variant="subtitle1"
+            sx={{
+              opacity: 0.8,
+              maxWidth: '400px',
+              lineHeight: 1.6,
+              fontWeight: 400,
+            }}
+          >
+            Generating proof for account: {userEmail}
           </Typography>
-          {!circuitLoaded && <Alert severity="info">Loading circuit...</Alert>}
-          
-          <Typography variant="subtitle1" sx={{ mt: 2 }}>JWT Token:</Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            value={jwt || 'No JWT found'}
-            InputProps={{ readOnly: true }}
-            margin="normal"
-          />
+        )}
 
-          <Typography variant="subtitle1" sx={{ mt: 2 }}>Google Public Key:</Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            value={pubkey ? JSON.stringify(pubkey, null, 2) : 'Loading public key...'}
-            InputProps={{ readOnly: true }}
-            margin="normal"
-          />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+          {(status === 'generating' || status === 'verifying') && (
+            <CircularProgress size={24} sx={{ color: 'white' }} />
+          )}
+          <Typography variant="subtitle1">
+            {getStatusMessage()}
+          </Typography>
+        </Box>
 
-          <Typography variant="subtitle1" sx={{ mt: 2 }}>Merkle Proof Inputs:</Typography>
-          <TextField label="Merkle Root" name="merkle_root" fullWidth margin="normal" value={inputs.merkle_root} onChange={handleChange} />
-          <TextField label="Proof Siblings (JSON array)" name="proof_siblings" fullWidth margin="normal" value={inputs.proof_siblings} onChange={handleChange} />
-          <TextField label="Proof Index" name="proof_index" fullWidth margin="normal" value={inputs.proof_index} onChange={handleChange} />
-          
-          <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-            <Button 
-              variant="contained" 
-              onClick={handleGenerateProof} 
-              disabled={!circuitLoaded || !pubkey || isGenerating}
-            >
-              {isGenerating ? 'Generating Proof...' : 'Generate Proof'}
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleVerifyProof}
-              disabled={!proofVerify || isVerifying}
-              color="secondary"
-            >
-              {isVerifying ? 'Verifying...' : 'Verify Proof'}
-            </Button>
-          </Stack>
-          
-          {proofVerify && (
-            <>
-              <Typography variant="subtitle1" sx={{ mt: 2 }}>Proof:</Typography>
-              <Box sx={{ position: 'relative' }}>
-                <pre style={{ 
-                  background: '#f5f5f5', 
-                  padding: 8, 
-                  borderRadius: 4,
-                  maxHeight: '100px',
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  {JSON.stringify(proofVerify.slice(0, 2), null, 2)}
-                  {proofVerify.length > 2 && (
-                    <Box sx={{ 
-                      position: 'absolute', 
-                      bottom: 0, 
-                      left: 0, 
-                      right: 0, 
-                      background: 'linear-gradient(transparent, #f5f5f5)',
-                      height: '40px',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                      padding: '4px'
-                    }}>
-                      <Typography variant="caption" color="text.secondary">
-                        ... {proofVerify.length - 2} more elements
-                      </Typography>
-                    </Box>
-                  )}
-                </pre>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    navigator.clipboard.writeText(JSON.stringify(proofVerify, null, 2));
-                  }}
-                  sx={{ mt: 1 }}
-                >
-                  Copy Full Proof
-                </Button>
-              </Box>
-              
-              <Typography variant="subtitle1" sx={{ mt: 2 }}>Public Inputs:</Typography>
-              <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
-                {JSON.stringify(publicInputs, null, 2)}
-              </pre>
-            </>
-          )}
-          
-          {verificationResult && (
-            <Alert 
-              severity={verificationResult.isValid ? "success" : "error"}
-              sx={{ mt: 2 }}
-            >
-              {verificationResult.message}
-            </Alert>
-          )}
-          
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-        </CardContent>
-      </Card>
+        {error && (
+          <Typography
+            sx={{
+              color: '#ff6b6b',
+              mt: 2,
+              p: 2,
+              borderRadius: 1,
+              backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            }}
+          >
+            {error}
+          </Typography>
+        )}
+
+        {verificationResult && (
+          <Typography
+            sx={{
+              color: verificationResult.isValid ? '#4caf50' : '#ff6b6b',
+              mt: 2,
+              p: 2,
+              borderRadius: 1,
+              backgroundColor: verificationResult.isValid 
+                ? 'rgba(76, 175, 80, 0.1)' 
+                : 'rgba(255, 107, 107, 0.1)',
+            }}
+          >
+            {verificationResult.message}
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 }
