@@ -42,6 +42,39 @@ All in **one single zkSNARK proof**, submitted to a centralized verifier.
 
 ---
 
+## High-Level App Flow
+
+There are two main actors:
+
+- **Server** (run by the event core team; assumed honest—can later be replaced by an on-chain verifier for full transparency)  
+- **Client** (an event participant who needs an anonymous credential to access the app)
+
+### Steps
+
+1. **Merkle Tree Setup (Server)**  
+   - Core team collects the list of approved emails.  
+   - Builds a Merkle tree over the email hashes.  
+   - Publishes the Merkle root on the server.
+
+2. **Path Distribution (Server → Client)**  
+   - When participants arrive, the server provides each one with:  
+     - The Merkle root  
+     - Their unique Merkle path (siblings + indices)  
+
+3. **Login & Proof Generation (Client)**  
+   - Participant signs in via Google OAuth2 → obtains a JWT.  
+   - Client code automatically extracts the leaf (email hash) and uses:  
+     - The JWT  
+     - The Merkle root & path  
+     to generate **one** Noir zkSNARK proof that:  
+     1. The JWT is valid and tied to an approved email  
+     2. That email’s hash is indeed in the Merkle tree  
+
+4. **Verification & Access Grant (Client → Server)**  
+   - Client POSTs the proof + public inputs (root, path, nonce, etc.) to `/api/verify-jwt-proof`.  
+   - Server verifies the zkSNARK (and JWT logic) in one step.  
+   - On success, the server issues an anonymous session token and grants app access.
+
 ## Next Milestones
 
 1. **PCD Database**
