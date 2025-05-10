@@ -92,7 +92,11 @@ Join us in making private, unlinkable, verifiable identity as easy as "login wit
 
 ---
 
-https://github.com/user-attachments/assets/9382e71a-2b1f-4950-babf-cee6337d4aad
+
+
+https://github.com/user-attachments/assets/d749f6ea-8b5b-4ec8-96e2-49977d8ca26a
+
+
 
 ## Prerequisites
 
