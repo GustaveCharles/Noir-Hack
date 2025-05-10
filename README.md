@@ -205,7 +205,7 @@ A lightweight JSON blob the client generates and stores:
 
 We can see that the two most ressource intesive functions are the ones from the JWT library. It will be hard for us to bring this down, as it is an external library. We also note that our proving takes approximately 10 seconds. This is clearly above a usual Web2 UX experience, and thus we will explore alternative solutions for more comupte intensive proofs, like delegating to a coSNARK network, such as TACEO's.
 
-## 4. Next Actions
+## 5. Next Actions
 
 1. Build client-side PCD generator & local database
 2. Implement server Merkle-tree API (append & query commitments)
