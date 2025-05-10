@@ -1,5 +1,63 @@
 # Zauth
 
+# Introduction 
+
+**Zuitzerland** is a one-of-a-kind “pop-up village” experiment with strong decentralized-access (d/acc) vibes—think Zuzalu with a similar strong privacy focus. At this tiny scale, we’ve already achieved product–market fit: event organizers are clamoring for a self-hosted tool that lets attendees prove membership without exposing their identity or spamming their inboxes.
+
+---
+
+## Problem
+
+- **Cumbersome ticketing & KYC**  
+  Traditional events require issuing, scanning, and managing digital or paper tickets. If you rely on email as an identifier, you end up with long registration forms, spammy follow-up, and privacy risks.  
+- **Noisy login data**  
+  Organizers only want to know “someone from our event just logged in,” not collect personal profiles or behavioral data.  
+- **Repeated proof fatigue**  
+  Every time you need to verify a credential—age, nationality, banking status, on-chain activity—you re-run the same verification circuits, wasting time and compute.
+
+---
+
+## Our MVP: Anonymous Set-Membership Login
+
+We’ve built a **Noir-powered** circuit that simultaneously:
+
+1. **Verifies a user’s OAuth2 JWT** (email identity)  
+2. **Proves membership** in the event’s Semaphore identity set  
+
+All in **one single zkSNARK proof**, submitted to a centralized verifier.  
+
+- **Anonymous:** server only sees “✔️ someone from the event logged in”—no email, no profile.  
+- **Selective:** only pre-registered event participants can generate a valid proof.  
+- **Seamless:** attendees use the same email sign-in flow they already know; we just wrap it in a privacy layer.
+
+> **Current traction:** fully working prototype at Zuitzerland. Organizers love it.
+
+---
+
+## Why Now?
+
+- **Privacy is table stakes.** Even small communities demand confidentiality.  
+- **d/acc momentum.** Experimental villages like Zuzalu/Zuitzerland/ZuBerlin prove there’s appetite for decentralized, privacy-preserving tooling.  
+- **Noir + JWT + Semaphore = sweet spot.** We combine well-tested building blocks into a turnkey solution.
+
+---
+
+## Next Milestones
+
+1. **PCD Database**  
+   - Clients will store full Proof-Carrying Data (PCD) locally.  
+   - Server holds only **commitments + salts** in a Merkle tree for **unlinkable**, **auditable**, **private** storage of every proof generated during the event.  
+2. **Anonymous Transactions**  
+   - Leverage the same anonymous auth to enable write-access or tokens within the village app without deanonymizing users.  
+3. **Universal PCD Platform**  
+   - Extend beyond event login: proofs of age, nationality, bank balances (via Open Banking), on-chain protocol interactions, wallet liquidity, and more.  
+   - One proof per credential, re-usable and privately verifiable on-chain or off-chain.
+
+---
+
+Join us in making private, unlinkable, verifiable identity as easy as “login with email”—but so much more powerful.  
+
+
 # App Architecture Overview
 
 ## 1. Current Implementation
