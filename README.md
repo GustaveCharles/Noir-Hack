@@ -97,6 +97,9 @@ Join us in making private, unlinkable, verifiable identity as easy as "login wit
 https://github.com/user-attachments/assets/d749f6ea-8b5b-4ec8-96e2-49977d8ca26a
 
 
+**Notes on testing by judges**: 
+- The lenght of the JWT is of max 910 data bytes. We must add dynamic max lenght of JWT according to user's email and JWT. As such, for now it only works for a subset of global JWT, of lenght less or equal to 910. 
+- Merke Tree has been hard coded by ourselves, as testing purposes, and thus only our email are whitelisted.
 
 ## Prerequisites
 
