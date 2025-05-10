@@ -93,7 +93,7 @@ function Login() {
             fontWeight: 400,
           }}
         >
-          Sign in with your Google account to create your Zuitzpass proof
+          Sign in with your Google account to create your Zauth proof
         </Typography>
 
         <Button

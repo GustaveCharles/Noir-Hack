@@ -70,7 +70,7 @@ function VerifyProof() {
       <Box sx={{ mt: 4 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           <Typography variant="h5" component="h1" gutterBottom>
-            Verify Zuitzpass Proof
+            Verify Zauth Proof
           </Typography>
           <Typography variant="body1" gutterBottom sx={{ mb: 3 }}>
             Paste the proof from the Proof Creator page and fill in the public inputs:
