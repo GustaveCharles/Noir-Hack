@@ -23,7 +23,7 @@ Finally you assert that the computed root equals the public merkle_root.
 */
 
 global MAX_EMAIL_LENGTH:   u32 = 64; 
-global MAX_DATA_LENGTH: u32 = 512; // max length of signed data (headerb64 + "." + payloadb64)
+global MAX_DATA_LENGTH: u32 = 910; // max length of signed data (headerb64 + "." + payloadb64)
 global MAX_NONCE_LENGTH: u32 = 32; // we are verifying `nonce` claim
 global M: u32 = 2;
 
@@ -48,11 +48,11 @@ fn main(
     proof_siblings:        [Field; TREE_DEPTH],  // sibling hashes
     proof_index:           Field,                // leaf index in the tree
     // PCD Merkle tree parameters
-    pcd_hash: pub Field,             // hash of the pcd that we want to provide with our auth
-    pcd_merkle_root: pub Field,      // current root of the PCD Merkle tree
-    pcd_proof_siblings: [Field; PCD_TREE_DEPTH], // sibling hashes for PCD tree
-    pcd_proof_index: Field,          // index where we want to insert/verify the PCD
-    is_adding_pcd: bool              // flag to indicate whether we're adding or just verifying
+    // pcd_hash: pub Field,             // hash of the pcd that we want to provide with our auth
+    // pcd_merkle_root: pub Field,      // current root of the PCD Merkle tree
+    // pcd_proof_siblings: [Field; PCD_TREE_DEPTH], // sibling hashes for PCD tree
+    // pcd_proof_index: Field,          // index where we want to insert/verify the PCD
+    // is_adding_pcd: bool              // flag to indicate whether we're adding or just verifying
 ) {
     let jwt = JWT::init(
         data,
@@ -75,15 +75,15 @@ fn main(
     // 3) Verify the Merkle proof
     belongs_to_merkle_tree(merkle_root, leaf, proof_index, proof_siblings);
 
-    // Handle the PCD Merkle tree operations
-    if is_adding_pcd {
-        // Add the PCD hash to the PCD Merkle tree and get the new root
-        let new_pcd_root = add_pcd_to_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
-        assert(new_pcd_root != pcd_merkle_root);
-    } else {
-        // Verify that the PCD exists in the tree
-        verify_pcd_in_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
-    }
+    // // Handle the PCD Merkle tree operations
+    // if is_adding_pcd {
+    //     // Add the PCD hash to the PCD Merkle tree and get the new root
+    //     let new_pcd_root = add_pcd_to_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
+    //     assert(new_pcd_root != pcd_merkle_root);
+    // } else {
+    //     // Verify that the PCD exists in the tree
+    //     verify_pcd_in_merkle_tree(pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index);
+    // }
 }
 
 //-----------------------------------------------------------------------------
@@ -197,277 +197,1298 @@ fn test_merkle_membership_wrong_leaf() {
     belongs_to_merkle_tree(root, wrong_leaf, indexes, hash_path);
 }
 
+    fn concat_header_and_payload<let H: u32, let P: u32>(
+        header: BoundedVec<u8, H>,
+        payload: BoundedVec<u8, P>
+    ) -> BoundedVec<u8, H + 1 + P> {
+        let mut concated = BoundedVec { storage: [0; H + 1 + P], len: 0 };
+        for i in 0..H {
+            if i < header.len() {
+                concated.push(header.get(i));
+            }
+        }
+        concated.push(".".as_bytes()[0]);
+        for i in 0..P {
+            if i < payload.len() {
+                concated.push(payload.get(i));
+            }
+        }
+        concated
+    }
+
+// #[test]
+// fn test_main_3(){
+//     let pubkey_limbs: [u128; 18] = [0x9d9b7ab520532396758488b2100155, 0x87ff0f733247ea1ae377d26bdd60aa, 0x55e1805ec2babe74ebadb5de3c29a7, 0x4131e289b5519e562dff8935a669e2, 0xe974f2f0179abc0cc837efb26a9d5d, 0x72f158dfb2a2ba0fd881d8742426ec, 0x7e56e9182ef83caea0a45cfdaba45a, 0xc2b9b23f6684f0442257dbb8a37291, 0xfc0ecae4fe9f8be5c52a91edd59db2, 0x3ba9bd0376ade89881c7bafa2b36de, 0x3548bec7032b97739300f7fd72769b, 0x6a5b4b975ccf938c5e63ee41d57c7c, 0x4fabc9dbb6a9157f91a87adaff6e66, 0x303d705edf9cae022cd91f57f332b6, 0x1834cc2b65d9d2cab6dd210ba58cad, 0x43b9c3ca0df606d243d4c442794829, 0x5239e9f174adc5871d580714b1eb98, 0xe1];
+//     let pubkey_redc_limbs: [u128; 18] = [0x1e7578875458139006e47aac5c17fb, 0x249a5affa65fe288cb0df8ab6548be, 0xc29ec9b115f3132ff5fb71e744fba3, 0xbde4d1e1b2e894dd482277dc14aba5, 0x675f382edc2e53fabb2c785f0dd7e8, 0x8af86434e50f50ddfc9b46ce2c8990, 0xbaf8f36a4caec8a61d14be456599d3, 0x4ac14c9865afb8da5ab36b76e6d651, 0x2be72e03504024bbc777e0a1e9d16d, 0x249a0c4d673705ab5ad1757a225fea, 0x0300712f5005899fffeb1289f9ef4b, 0x73eb759f585e597acb40bfbf59efed, 0xe070a169f35358c7ead1df56d02d4b, 0x5657e0c005b6bca107abd9024b4dd1, 0xe6da2103c7938911ca44a5e641c541, 0xc98e9e1235394e0eb2b87143fd42c3, 0xdb1c76abaf095069edf0ea5248ef95, 0x0122];
+//     let signature_limbs: [u128; 18] = [ 0xabf49b8204494364afed7815aae9ba, 0x8888b30c7c97cdc0db80766909eba6, 0x5bd07a0786375af02d5f8e9cf9e0bb, 0xb5b1f36ae1cd61952109a814129827, 0xbd011faeecf1eb1ea383e81e1b424e, 0xdb819268100bedf9bb00ceae0c074a, 0x0eaeb846fc824d344bba37468c316d, 0x9123576355f3f5e896ea786a86ce8a, 0x1b9d1c8c412149b3c82e6498a732a9, 0x3d8cbd4f7856947f02ff19e8c478d0, 0x1d3f1389db68a6d6168d9e8104e742, 0x134d7ca6427322a9f62176146be4dc, 0x072d9968d8070f0612a7a781eb3cd0, 0x29a01c7d38758d3cb1ab0a45f9f3e7, 0xa92f67bad1f1995d9e72c23bfa469d, 0x9139299fb1abcc7c45a0305a92a454, 0x6f7998d04ba5abf002a11808d0de0e, 0x42 ];
+//     let header_base64url: [u8; 102] = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImE1MGY2ZTcwZWY0YjU0OGE1ZmQ5MTQyZWVjZDFmYjhmNTRkY2U5ZWUiLCJ0eXAiOiJKV1QifQ".as_bytes();
+//     let payload_base64url: [u8; 774] = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI2OTgxMDk0NzQ4MDUtbnZmZzloaDMxa2ptYjZtbW41MWQ0b2lvbWJncjNzM3YuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI2OTgxMDk0NzQ4MDUtbnZmZzloaDMxa2ptYjZtbW41MWQ0b2lvbWJncjNzM3YuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTYzMjIyNTIzMjA3NTUyMTgyMjIiLCJlbWFpbCI6ImJhc2UuZW1haWwud2FsbGV0QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJhdF9oYXNoIjoiVzZWN2NmdURjVVhNeTNqWHNpbmRTZyIsIm5vbmNlIjoiZDhkQTZCRjI2OTY0YUY5RDdlRWQ5ZTAzRTUzNDE1RDM3YUE5NjA0NSIsIm5hbWUiOiJUZXN0IEdtYWlsIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pVa3FXYVpVMUtxX1RKMU5tak9XWUtBZ1VSc2txUl9IX21FbXVIQmVGRklCSHhWUT1zOTYtYyIsImdpdmVuX25hbWUiOiJUZXN0IiwiZmFtaWx5X25hbWUiOiJHbWFpbCIsImlhdCI6MTcyOTIwNDM2NiwiZXhwIjoxNzI5MjA3OTY2fQ".as_bytes();
+//     let payload_json_padded: [u8; 580] = "{\"iss\":\"https://accounts.google.com\",\"azp\":\"698109474805-nvfg9hh31kjmb6mmn51d4oiombgr3s3v.apps.googleusercontent.com\",\"aud\":\"698109474805-nvfg9hh31kjmb6mmn51d4oiombgr3s3v.apps.googleusercontent.com\",\"sub\":\"116322252320755218222\",\"email\":\"base.email.wallet@gmail.com\",\"email_verified\":true,\"at_hash\":\"W6V7cfuDcUXMy3jXsindSg\",\"nonce\":\"d8dA6BF26964aF9D7eEd9e03E53415D37aA96045\",\"name\":\"Test Gmail\",\"picture\":\"https://lh3.googleusercontent.com/a/ACg8ocJUkqWaZU1Kq_TJ1NmjOWYKAgURskqR_H_mEmuHBeFFIBHxVQ=s96-c\",\"given_name\":\"Test\",\"family_name\":\"Gmail\",\"iat\":1729204366,\"exp\":1729207966}".as_bytes();
+//     let base64_decode_offset = 102 +1;
+
+//     let data = concat_header_and_payload::<102, 774>(
+//                     BoundedVec::from_array(header_base64url),
+//                     BoundedVec::from_array(payload_base64url)
+//                 );
+//     let jwt = JWT::init(
+//         data,
+//         base64_decode_offset,
+//         pubkey_limbs,
+//         pubkey_redc_limbs,
+//         signature_limbs,
+//     );
+
+//     jwt.verify();
+// }
+
 #[test]
-fn test_main() {
+fn test_main_2(){
     let pubkey_modulus_limbs = [
-        484791102317025465533947056954494751,
-        689128460766062759582134715581990032,
-        810523707777777878428965619663888709,
-        184404549238669475316963116864788898,
-        93466218048229154672139102341852900,
-        584828628768888069086079532464056431,
-        97425187031931427039620311245463762,
-        26273806718910063326353308419294998,
-        788747954066548540615875263034804664,
-        889704621954975151388848797463892494,
-        311999144542197118282319553447935979,
-        569776388981460921496753063185331362,
-        903966640703701959992132828577771898,
-        159022820921763067563807580152706463,
-        503819859541011037194389727017199051,
-        1078173269124751507098806957834900664,
-        808018922828293630146825008649069450,
-        163,
+        540950155664207248075758951764351951,
+        394972870116975750300451272632691836,
+        426331886007332955858776644420348516,
+        1261368678871899620712750136144689038,
+        1023195296250635113457741929445821575,
+        399975454725697341111920965088014050,
+        1212914598759829960691541871437271380,
+        854870492600267548597794221797968198,
+        443258839955138876054003982910112475,
+        484352037389082718188691134755903566,
+        767998846235599131063639145171820918,
+        927691997291950981240595943624097081,
+        641073354994056733874929415860093938,
+        78002032657650492338701599928206416,
+        286018496744870218361728973246718936,
+        11093873636633827207691074068809837,
+        709164899521530205295321340830408124,
+        187,
     ];
+
     let redc_params_limbs = [
-        1143167338325541577958669340190596824,
-        782066667103526839077340987159104121,
-        1067845759344375818181746341911682002,
-        880124617802511701465844415806808588,
-        285259139341669707856057706066903101,
-        1230850420220071595120007854793337041,
-        243441877489860292941608721967510056,
-        821283804950244931298352888469271304,
-        265590023859021620015146340457966193,
-        955602690275722281613949658760787989,
-        704159826142581942518373637894303280,
-        313938418637521056314346970388282852,
-        296174013877567499290252280618882959,
-        127533166408087917092441034792304239,
-        486694435757811118946661778147879193,
-        742440511645057019411661928820777129,
-        106100992772450627263374716203348785,
-        6409,
+        362520577948228447817106872809251665,
+        1267768381733020286571638523292478956,
+        803163591696641507776435770493459486,
+        3999593470856820737572120695569152,
+        802514966499265095853331241129074955,
+        704527045868008814215254592972736767,
+        336343422763874681157088923822178217,
+        1287792953829376591036437707444173080,
+        1076771307631644724135377607277840125,
+        279591822722773405773702726835637440,
+        538254434293035004641788390517788261,
+        426521723725443584897919779404518210,
+        325931578588934769354668545937298622,
+        690955314849786234914215646368498577,
+        249333084613405489843439771028877341,
+        1232691310075973528233253025751350055,
+        539463493447392094056891317708005156,
+        5591,
     ];
+
     let signature_limbs = [
-        782421962573548264472674190647943355,
-        528649442614902878048130358901749842,
-        795671681115216636642039527621785323,
-        342055983261463759066440970886912343,
-        320943042314824191484469254030368420,
-        233931545977215775766660875366648712,
-        166738968145911552289782464945436391,
-        1280090914380823160665554635957223606,
-        225322564371992173705155119766257284,
-        1012067778676730712845356243167441596,
-        337008035250054394089555850701430953,
-        441480997772890594691718538441538925,
-        1266099611422563733802354067242028554,
-        163890419575820619684088542045789366,
-        71236811945264458762129145425586273,
-        106105739687938386497215871288359508,
-        598323717706499880526430558338637686,
-        97,
+    751839770339258206963761587108952836,
+    1121529133202960289739059060165127363,
+    382794058313096274569211185210543538,
+    22326153231106446053016131028409947,
+    1301562544617812898159558837969310291,
+    1164846367620981298328699495094106973,
+    819214100633390773006641313199469945,
+    95687034868762490612551464194033401,
+    215701374197661912968504218209771405,
+    822657601304922533064295142991546059,
+    1316253717231949350003777513796083360,
+    713049615189894615236627570564470665,
+    907584140847876052332677727215296235,
+    1000965932665108641951223625141329517,
+    1210867050018298699394894105589237654,
+    1000726948264319454438390080338455146,
+    772414903803222043777626972820913738,
+    180,
     ];
-    let data: BoundedVec<u8, 512> = BoundedVec::from_array([
-        101, 121, 74, 104, 98, 71, 99, 105, 79, 105, 74, 83, 85, 122, 73, 49, 78, 105, 73, 115, 73,
-        110, 82, 53, 99, 67, 73, 54, 73, 107, 112, 88, 86, 67, 74, 57, 46, 101, 121, 74, 112, 99,
-        51, 77, 105, 79, 105, 74, 111, 100, 72, 82, 119, 79, 105, 56, 118, 100, 71, 86, 122, 100,
-        67, 53, 106, 98, 50, 48, 105, 76, 67, 74, 122, 100, 87, 73, 105, 79, 105, 74, 66, 81, 107,
-        78, 69, 77, 84, 73, 122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 120,
-        102, 100, 109, 86, 121, 97, 87, 90, 112, 90, 87, 81, 105, 79, 110, 82, 121, 100, 87, 85,
-        115, 73, 109, 53, 118, 98, 109, 78, 108, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73,
-        122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 119, 105, 79, 105, 74,
-        104, 98, 71, 108, 106, 90, 85, 66, 48, 90, 88, 78, 48, 76, 109, 78, 118, 98, 83, 73, 115,
-        73, 109, 108, 104, 100, 67, 73, 54, 77, 84, 99, 122, 78, 122, 89, 48, 77, 106, 73, 120, 78,
-        121, 119, 105, 89, 88, 86, 107, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73, 122, 77, 84,
-        73, 122, 76, 106, 81, 49, 78, 106, 81, 49, 78, 106, 81, 49, 78, 105, 73, 115, 73, 109, 86,
-        52, 99, 67, 73, 54, 77, 84, 99, 53, 79, 84, 107, 53, 79, 84, 107, 53, 79, 88, 48,
-    ]);
-    let base64_decode_offset = 37;
 
 
+    let data: BoundedVec<u8, 910> = BoundedVec::from_array([
+101,
+121,
+74,
+104,
+98,
+71,
+99,
+105,
+79,
+105,
+74,
+83,
+85,
+122,
+73,
+49,
+78,
+105,
+73,
+115,
+73,
+109,
+116,
+112,
+90,
+67,
+73,
+54,
+73,
+109,
+85,
+120,
+78,
+71,
+77,
+122,
+78,
+50,
+81,
+50,
+90,
+84,
+86,
+106,
+78,
+122,
+85,
+50,
+90,
+84,
+104,
+105,
+78,
+122,
+74,
+109,
+90,
+71,
+73,
+49,
+77,
+68,
+65,
+48,
+89,
+122,
+66,
+106,
+89,
+122,
+77,
+49,
+78,
+106,
+77,
+122,
+78,
+122,
+107,
+121,
+78,
+71,
+85,
+105,
+76,
+67,
+74,
+48,
+101,
+88,
+65,
+105,
+79,
+105,
+74,
+75,
+86,
+49,
+81,
+105,
+102,
+81,
+46,
+101,
+121,
+74,
+112,
+99,
+51,
+77,
+105,
+79,
+105,
+74,
+111,
+100,
+72,
+82,
+119,
+99,
+122,
+111,
+118,
+76,
+50,
+70,
+106,
+89,
+50,
+57,
+49,
+98,
+110,
+82,
+122,
+76,
+109,
+100,
+118,
+98,
+50,
+100,
+115,
+90,
+83,
+53,
+106,
+98,
+50,
+48,
+105,
+76,
+67,
+74,
+104,
+101,
+110,
+65,
+105,
+79,
+105,
+73,
+50,
+77,
+68,
+81,
+50,
+77,
+68,
+81,
+51,
+77,
+106,
+107,
+121,
+78,
+68,
+77,
+116,
+90,
+50,
+104,
+114,
+97,
+109,
+82,
+50,
+99,
+109,
+53,
+110,
+90,
+71,
+74,
+110,
+78,
+106,
+85,
+49,
+79,
+71,
+112,
+50,
+97,
+50,
+107,
+121,
+98,
+87,
+70,
+110,
+90,
+51,
+78,
+113,
+100,
+71,
+120,
+109,
+100,
+109,
+103,
+117,
+89,
+88,
+66,
+119,
+99,
+121,
+53,
+110,
+98,
+50,
+57,
+110,
+98,
+71,
+86,
+49,
+99,
+50,
+86,
+121,
+89,
+50,
+57,
+117,
+100,
+71,
+86,
+117,
+100,
+67,
+53,
+106,
+98,
+50,
+48,
+105,
+76,
+67,
+74,
+104,
+100,
+87,
+81,
+105,
+79,
+105,
+73,
+50,
+77,
+68,
+81,
+50,
+77,
+68,
+81,
+51,
+77,
+106,
+107,
+121,
+78,
+68,
+77,
+116,
+90,
+50,
+104,
+114,
+97,
+109,
+82,
+50,
+99,
+109,
+53,
+110,
+90,
+71,
+74,
+110,
+78,
+106,
+85,
+49,
+79,
+71,
+112,
+50,
+97,
+50,
+107,
+121,
+98,
+87,
+70,
+110,
+90,
+51,
+78,
+113,
+100,
+71,
+120,
+109,
+100,
+109,
+103,
+117,
+89,
+88,
+66,
+119,
+99,
+121,
+53,
+110,
+98,
+50,
+57,
+110,
+98,
+71,
+86,
+49,
+99,
+50,
+86,
+121,
+89,
+50,
+57,
+117,
+100,
+71,
+86,
+117,
+100,
+67,
+53,
+106,
+98,
+50,
+48,
+105,
+76,
+67,
+74,
+122,
+100,
+87,
+73,
+105,
+79,
+105,
+73,
+120,
+77,
+68,
+81,
+48,
+79,
+84,
+99,
+48,
+77,
+68,
+89,
+50,
+77,
+84,
+69,
+48,
+77,
+122,
+99,
+52,
+79,
+68,
+81,
+119,
+78,
+84,
+73,
+105,
+76,
+67,
+74,
+108,
+98,
+87,
+70,
+112,
+98,
+67,
+73,
+54,
+73,
+109,
+49,
+104,
+89,
+50,
+86,
+117,
+98,
+50,
+86,
+65,
+90,
+50,
+49,
+104,
+97,
+87,
+119,
+117,
+89,
+50,
+57,
+116,
+73,
+105,
+119,
+105,
+90,
+87,
+49,
+104,
+97,
+87,
+120,
+102,
+100,
+109,
+86,
+121,
+97,
+87,
+90,
+112,
+90,
+87,
+81,
+105,
+79,
+110,
+82,
+121,
+100,
+87,
+85,
+115,
+73,
+109,
+70,
+48,
+88,
+50,
+104,
+104,
+99,
+50,
+103,
+105,
+79,
+105,
+74,
+78,
+89,
+106,
+69,
+53,
+84,
+51,
+66,
+52,
+87,
+67,
+49,
+82,
+89,
+51,
+74,
+83,
+77,
+85,
+86,
+67,
+82,
+86,
+100,
+84,
+82,
+69,
+78,
+51,
+73,
+105,
+119,
+105,
+98,
+109,
+57,
+117,
+89,
+50,
+85,
+105,
+79,
+105,
+74,
+108,
+77,
+68,
+107,
+52,
+97,
+110,
+86,
+119,
+77,
+109,
+89,
+119,
+89,
+105,
+73,
+115,
+73,
+109,
+53,
+105,
+90,
+105,
+73,
+54,
+77,
+84,
+99,
+48,
+78,
+106,
+103,
+120,
+78,
+84,
+81,
+122,
+78,
+67,
+119,
+105,
+98,
+109,
+70,
+116,
+90,
+83,
+73,
+54,
+73,
+107,
+53,
+118,
+90,
+83,
+66,
+78,
+89,
+87,
+78,
+108,
+73,
+105,
+119,
+105,
+99,
+71,
+108,
+106,
+100,
+72,
+86,
+121,
+90,
+83,
+73,
+54,
+73,
+109,
+104,
+48,
+100,
+72,
+66,
+122,
+79,
+105,
+56,
+118,
+98,
+71,
+103,
+122,
+76,
+109,
+100,
+118,
+98,
+50,
+100,
+115,
+90,
+88,
+86,
+122,
+90,
+88,
+74,
+106,
+98,
+50,
+53,
+48,
+90,
+87,
+53,
+48,
+76,
+109,
+78,
+118,
+98,
+83,
+57,
+104,
+76,
+48,
+70,
+68,
+90,
+122,
+104,
+118,
+89,
+48,
+115,
+119,
+90,
+107,
+104,
+53,
+100,
+122,
+78,
+51,
+87,
+69,
+82,
+119,
+84,
+69,
+49,
+90,
+86,
+87,
+104,
+121,
+101,
+85,
+70,
+122,
+97,
+87,
+57,
+82,
+100,
+51,
+108,
+82,
+86,
+106,
+74,
+120,
+90,
+71,
+116,
+71,
+83,
+69,
+103,
+50,
+85,
+88,
+74,
+54,
+101,
+108,
+66,
+120,
+87,
+88,
+70,
+117,
+83,
+51,
+70,
+104,
+100,
+51,
+82,
+88,
+80,
+88,
+77,
+53,
+78,
+105,
+49,
+106,
+73,
+105,
+119,
+105,
+90,
+50,
+108,
+50,
+90,
+87,
+53,
+102,
+98,
+109,
+70,
+116,
+90,
+83,
+73,
+54,
+73,
+107,
+53,
+118,
+90,
+83,
+73,
+115,
+73,
+109,
+90,
+104,
+98,
+87,
+108,
+115,
+101,
+86,
+57,
+117,
+89,
+87,
+49,
+108,
+73,
+106,
+111,
+105,
+84,
+87,
+70,
+106,
+90,
+83,
+73,
+115,
+73,
+109,
+108,
+104,
+100,
+67,
+73,
+54,
+77,
+84,
+99,
+48,
+78,
+106,
+103,
+120,
+78,
+84,
+99,
+122,
+78,
+67,
+119,
+105,
+90,
+88,
+104,
+119,
+73,
+106,
+111,
+120,
+78,
+122,
+81,
+50,
+79,
+68,
+69,
+53,
+77,
+122,
+77,
+48,
+76,
+67,
+74,
+113,
+100,
+71,
+107,
+105,
+79,
+105,
+73,
+119,
+79,
+84,
+103,
+122,
+79,
+87,
+69,
+48,
+79,
+87,
+81,
+49,
+89,
+84,
+85,
+119,
+90,
+106,
+99,
+119,
+77,
+84,
+85,
+120,
+89,
+84,
+108,
+109,
+77,
+84,
+73,
+121,
+78,
+109,
+70,
+106,77,71,70,104,79,84,104,104,90,109, 81,52,77,50,86,105,73,110,48]);
+    let base64_decode_offset = 103;
+
+
+    // offset from start of data to beginning of payload (header + 1 for the dot)
+    let base64_decode_offset = 103;
     // Create test data for a simple Merkle tree
-    let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
+    let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("macenoe@gmail.com".as_bytes());
     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
     let leaf: Field = hash(email_fields, LEAF_LIMBS);
     let indexes = 0; // Position in the tree
     // 2) build a dummy sibling path
-    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+    let hash_path: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
     // 3) build tree and get the real root
     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+    println(root);
     let mut mt1 = MerkleTree::from(root,poseidon_hasher);
-    //main(data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs, root, hash_path, indexes)
 
+    main(data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs, root, hash_path, indexes)
 }
+// #[test]
+// fn test_main() {
+//     let pubkey_modulus_limbs = [
+//         484791102317025465533947056954494751,
+//         689128460766062759582134715581990032,
+//         810523707777777878428965619663888709,
+//         184404549238669475316963116864788898,
+//         93466218048229154672139102341852900,
+//         584828628768888069086079532464056431,
+//         97425187031931427039620311245463762,
+//         26273806718910063326353308419294998,
+//         788747954066548540615875263034804664,
+//         889704621954975151388848797463892494,
+//         311999144542197118282319553447935979,
+//         569776388981460921496753063185331362,
+//         903966640703701959992132828577771898,
+//         159022820921763067563807580152706463,
+//         503819859541011037194389727017199051,
+//         1078173269124751507098806957834900664,
+//         808018922828293630146825008649069450,
+//         163,
+//     ];
+//     let redc_params_limbs = [
+//         1143167338325541577958669340190596824,
+//         782066667103526839077340987159104121,
+//         1067845759344375818181746341911682002,
+//         880124617802511701465844415806808588,
+//         285259139341669707856057706066903101,
+//         1230850420220071595120007854793337041,
+//         243441877489860292941608721967510056,
+//         821283804950244931298352888469271304,
+//         265590023859021620015146340457966193,
+//         955602690275722281613949658760787989,
+//         704159826142581942518373637894303280,
+//         313938418637521056314346970388282852,
+//         296174013877567499290252280618882959,
+//         127533166408087917092441034792304239,
+//         486694435757811118946661778147879193,
+//         742440511645057019411661928820777129,
+//         106100992772450627263374716203348785,
+//         6409,
+//     ];
+//     let signature_limbs = [
+//         782421962573548264472674190647943355,
+//         528649442614902878048130358901749842,
+//         795671681115216636642039527621785323,
+//         342055983261463759066440970886912343,
+//         320943042314824191484469254030368420,
+//         233931545977215775766660875366648712,
+//         166738968145911552289782464945436391,
+//         1280090914380823160665554635957223606,
+//         225322564371992173705155119766257284,
+//         1012067778676730712845356243167441596,
+//         337008035250054394089555850701430953,
+//         441480997772890594691718538441538925,
+//         1266099611422563733802354067242028554,
+//         163890419575820619684088542045789366,
+//         71236811945264458762129145425586273,
+//         106105739687938386497215871288359508,
+//         598323717706499880526430558338637686,
+//         97,
+//     ];
+//     let data: BoundedVec<u8, 512> = BoundedVec::from_array([
+//         101, 121, 74, 104, 98, 71, 99, 105, 79, 105, 74, 83, 85, 122, 73, 49, 78, 105, 73, 115, 73,
+//         110, 82, 53, 99, 67, 73, 54, 73, 107, 112, 88, 86, 67, 74, 57, 46, 101, 121, 74, 112, 99,
+//         51, 77, 105, 79, 105, 74, 111, 100, 72, 82, 119, 79, 105, 56, 118, 100, 71, 86, 122, 100,
+//         67, 53, 106, 98, 50, 48, 105, 76, 67, 74, 122, 100, 87, 73, 105, 79, 105, 74, 66, 81, 107,
+//         78, 69, 77, 84, 73, 122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 120,
+//         102, 100, 109, 86, 121, 97, 87, 90, 112, 90, 87, 81, 105, 79, 110, 82, 121, 100, 87, 85,
+//         115, 73, 109, 53, 118, 98, 109, 78, 108, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73,
+//         122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 119, 105, 79, 105, 74,
+//         104, 98, 71, 108, 106, 90, 85, 66, 48, 90, 88, 78, 48, 76, 109, 78, 118, 98, 83, 73, 115,
+//         73, 109, 108, 104, 100, 67, 73, 54, 77, 84, 99, 122, 78, 122, 89, 48, 77, 106, 73, 120, 78,
+//         121, 119, 105, 89, 88, 86, 107, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73, 122, 77, 84,
+//         73, 122, 76, 106, 81, 49, 78, 106, 81, 49, 78, 106, 81, 49, 78, 105, 73, 115, 73, 109, 86,
+//         52, 99, 67, 73, 54, 77, 84, 99, 53, 79, 84, 107, 53, 79, 84, 107, 53, 79, 88, 48,
+//     ]);
+//     let base64_decode_offset = 37;
 
 
-pub fn get_test_data() -> (
-    [u128; 18],  // pubkey_modulus_limbs
-    [u128; 18],  // redc_params_limbs
-    [u128; 18],  // signature_limbs
-    BoundedVec<u8, 512>, // data
-    u32,          // base64_decode_offset
-    BoundedVec<u8, 64> // expected_email
-) {
-    let pubkey_modulus_limbs = [
-        484791102317025465533947056954494751,
-        689128460766062759582134715581990032,
-        810523707777777878428965619663888709,
-        184404549238669475316963116864788898,
-        93466218048229154672139102341852900,
-        584828628768888069086079532464056431,
-        97425187031931427039620311245463762,
-        26273806718910063326353308419294998,
-        788747954066548540615875263034804664,
-        889704621954975151388848797463892494,
-        311999144542197118282319553447935979,
-        569776388981460921496753063185331362,
-        903966640703701959992132828577771898,
-        159022820921763067563807580152706463,
-        503819859541011037194389727017199051,
-        1078173269124751507098806957834900664,
-        808018922828293630146825008649069450,
-        163,
-    ];
-    let redc_params_limbs = [
-        1143167338325541577958669340190596824,
-        782066667103526839077340987159104121,
-        1067845759344375818181746341911682002,
-        880124617802511701465844415806808588,
-        285259139341669707856057706066903101,
-        1230850420220071595120007854793337041,
-        243441877489860292941608721967510056,
-        821283804950244931298352888469271304,
-        265590023859021620015146340457966193,
-        955602690275722281613949658760787989,
-        704159826142581942518373637894303280,
-        313938418637521056314346970388282852,
-        296174013877567499290252280618882959,
-        127533166408087917092441034792304239,
-        486694435757811118946661778147879193,
-        742440511645057019411661928820777129,
-        106100992772450627263374716203348785,
-        6409,
-    ];
-    let signature_limbs = [
-        782421962573548264472674190647943355,
-        528649442614902878048130358901749842,
-        795671681115216636642039527621785323,
-        342055983261463759066440970886912343,
-        320943042314824191484469254030368420,
-        233931545977215775766660875366648712,
-        166738968145911552289782464945436391,
-        1280090914380823160665554635957223606,
-        225322564371992173705155119766257284,
-        1012067778676730712845356243167441596,
-        337008035250054394089555850701430953,
-        441480997772890594691718538441538925,
-        1266099611422563733802354067242028554,
-        163890419575820619684088542045789366,
-        71236811945264458762129145425586273,
-        106105739687938386497215871288359508,
-        598323717706499880526430558338637686,
-        97,
-    ];
-    let data: BoundedVec<u8, 512> = BoundedVec::from_array([
-        101, 121, 74, 104, 98, 71, 99, 105, 79, 105, 74, 83, 85, 122, 73, 49, 78, 105, 73, 115, 73,
-        110, 82, 53, 99, 67, 73, 54, 73, 107, 112, 88, 86, 67, 74, 57, 46, 101, 121, 74, 112, 99,
-        51, 77, 105, 79, 105, 74, 111, 100, 72, 82, 119, 79, 105, 56, 118, 100, 71, 86, 122, 100,
-        67, 53, 106, 98, 50, 48, 105, 76, 67, 74, 122, 100, 87, 73, 105, 79, 105, 74, 66, 81, 107,
-        78, 69, 77, 84, 73, 122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 120,
-        102, 100, 109, 86, 121, 97, 87, 90, 112, 90, 87, 81, 105, 79, 110, 82, 121, 100, 87, 85,
-        115, 73, 109, 53, 118, 98, 109, 78, 108, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73,
-        122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 119, 105, 79, 105, 74,
-        104, 98, 71, 108, 106, 90, 85, 66, 48, 90, 88, 78, 48, 76, 109, 78, 118, 98, 83, 73, 115,
-        73, 109, 108, 104, 100, 67, 73, 54, 77, 84, 99, 122, 78, 122, 89, 48, 77, 106, 73, 120, 78,
-        121, 119, 105, 89, 88, 86, 107, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73, 122, 77, 84,
-        73, 122, 76, 106, 81, 49, 78, 106, 81, 49, 78, 106, 81, 49, 78, 105, 73, 115, 73, 109, 86,
-        52, 99, 67, 73, 54, 77, 84, 99, 53, 79, 84, 107, 53, 79, 84, 107, 53, 79, 88, 48,
-    ]);
-    let base64_decode_offset = 37;
-    let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
+//     // Create test data for a simple Merkle tree
+//     let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
+//     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+//     let leaf: Field = hash(email_fields, LEAF_LIMBS);
+//     let indexes = 0; // Position in the tree
+//     // 2) build a dummy sibling path
+//     let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+//     // 3) build tree and get the real root
+//     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+//     let mut mt1 = MerkleTree::from(root,poseidon_hasher);
+//     //main(data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs, root, hash_path, indexes)
 
-    (
-        pubkey_modulus_limbs,
-        redc_params_limbs,
-        signature_limbs,
-        data,
-        base64_decode_offset,
-        expected_email,
-    )
-}
+// }
 
-#[test]
-fn test_main_with_pcd_verification() {
-    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
 
-    // Test data for email verification
-    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
-    let leaf: Field = hash(email_fields, LEAF_LIMBS);
-    let indexes = 0;
-    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
-    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+// pub fn get_test_data() -> (
+//     [u128; 18],  // pubkey_modulus_limbs
+//     [u128; 18],  // redc_params_limbs
+//     [u128; 18],  // signature_limbs
+//     BoundedVec<u8, 512>, // data
+//     u32,          // base64_decode_offset
+//     BoundedVec<u8, 64> // expected_email
+// ) {
+//     let pubkey_modulus_limbs = [
+//         484791102317025465533947056954494751,
+//         689128460766062759582134715581990032,
+//         810523707777777878428965619663888709,
+//         184404549238669475316963116864788898,
+//         93466218048229154672139102341852900,
+//         584828628768888069086079532464056431,
+//         97425187031931427039620311245463762,
+//         26273806718910063326353308419294998,
+//         788747954066548540615875263034804664,
+//         889704621954975151388848797463892494,
+//         311999144542197118282319553447935979,
+//         569776388981460921496753063185331362,
+//         903966640703701959992132828577771898,
+//         159022820921763067563807580152706463,
+//         503819859541011037194389727017199051,
+//         1078173269124751507098806957834900664,
+//         808018922828293630146825008649069450,
+//         163,
+//     ];
+//     let redc_params_limbs = [
+//         1143167338325541577958669340190596824,
+//         782066667103526839077340987159104121,
+//         1067845759344375818181746341911682002,
+//         880124617802511701465844415806808588,
+//         285259139341669707856057706066903101,
+//         1230850420220071595120007854793337041,
+//         243441877489860292941608721967510056,
+//         821283804950244931298352888469271304,
+//         265590023859021620015146340457966193,
+//         955602690275722281613949658760787989,
+//         704159826142581942518373637894303280,
+//         313938418637521056314346970388282852,
+//         296174013877567499290252280618882959,
+//         127533166408087917092441034792304239,
+//         486694435757811118946661778147879193,
+//         742440511645057019411661928820777129,
+//         106100992772450627263374716203348785,
+//         6409,
+//     ];
+//     let signature_limbs = [
+//         782421962573548264472674190647943355,
+//         528649442614902878048130358901749842,
+//         795671681115216636642039527621785323,
+//         342055983261463759066440970886912343,
+//         320943042314824191484469254030368420,
+//         233931545977215775766660875366648712,
+//         166738968145911552289782464945436391,
+//         1280090914380823160665554635957223606,
+//         225322564371992173705155119766257284,
+//         1012067778676730712845356243167441596,
+//         337008035250054394089555850701430953,
+//         441480997772890594691718538441538925,
+//         1266099611422563733802354067242028554,
+//         163890419575820619684088542045789366,
+//         71236811945264458762129145425586273,
+//         106105739687938386497215871288359508,
+//         598323717706499880526430558338637686,
+//         97,
+//     ];
+//     let data: BoundedVec<u8, 512> = BoundedVec::from_array([
+//         101, 121, 74, 104, 98, 71, 99, 105, 79, 105, 74, 83, 85, 122, 73, 49, 78, 105, 73, 115, 73,
+//         110, 82, 53, 99, 67, 73, 54, 73, 107, 112, 88, 86, 67, 74, 57, 46, 101, 121, 74, 112, 99,
+//         51, 77, 105, 79, 105, 74, 111, 100, 72, 82, 119, 79, 105, 56, 118, 100, 71, 86, 122, 100,
+//         67, 53, 106, 98, 50, 48, 105, 76, 67, 74, 122, 100, 87, 73, 105, 79, 105, 74, 66, 81, 107,
+//         78, 69, 77, 84, 73, 122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 120,
+//         102, 100, 109, 86, 121, 97, 87, 90, 112, 90, 87, 81, 105, 79, 110, 82, 121, 100, 87, 85,
+//         115, 73, 109, 53, 118, 98, 109, 78, 108, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73,
+//         122, 77, 84, 73, 122, 73, 105, 119, 105, 90, 87, 49, 104, 97, 87, 119, 105, 79, 105, 74,
+//         104, 98, 71, 108, 106, 90, 85, 66, 48, 90, 88, 78, 48, 76, 109, 78, 118, 98, 83, 73, 115,
+//         73, 109, 108, 104, 100, 67, 73, 54, 77, 84, 99, 122, 78, 122, 89, 48, 77, 106, 73, 120, 78,
+//         121, 119, 105, 89, 88, 86, 107, 73, 106, 111, 105, 77, 84, 73, 122, 77, 84, 73, 122, 77, 84,
+//         73, 122, 76, 106, 81, 49, 78, 106, 81, 49, 78, 106, 81, 49, 78, 105, 73, 115, 73, 109, 86,
+//         52, 99, 67, 73, 54, 77, 84, 99, 53, 79, 84, 107, 53, 79, 84, 107, 53, 79, 88, 48,
+//     ]);
+//     let base64_decode_offset = 37;
+//     let expected_email: BoundedVec<u8, 64> = BoundedVec::from_array("alice@test.com".as_bytes());
 
-    // Test data for PCD verification
-    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
-    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
-    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
-    let pcd_proof_index = 0;
-    let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
-    let pcd_merkle_root: Field = MerkleTree::new(poseidon_hasher).calculate_root(pcd_hash, pcd_proof_index, pcd_proof_siblings);
+//     (
+//         pubkey_modulus_limbs,
+//         redc_params_limbs,
+//         signature_limbs,
+//         data,
+//         base64_decode_offset,
+//         expected_email,
+//     )
+// }
 
-    // Test verification mode (is_adding_pcd = false)
-    main(
-        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
-        root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
-    );
-}
+// #[test]
+// fn test_main_with_pcd_verification() {
+//     let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
 
-#[test]
-fn test_main_with_pcd_addition() {
-    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
+//     // Test data for email verification
+//     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+//     let leaf: Field = hash(email_fields, LEAF_LIMBS);
+//     let indexes = 0;
+//     let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+//     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
 
-    // Test data for email verification
-    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
-    let leaf: Field = hash(email_fields, LEAF_LIMBS);
-    let indexes = 0;
-    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
-    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+//     // Test data for PCD verification
+//     let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+//     let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+//     let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+//     let pcd_proof_index = 0;
+//     let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
+//     let pcd_merkle_root: Field = MerkleTree::new(poseidon_hasher).calculate_root(pcd_hash, pcd_proof_index, pcd_proof_siblings);
 
-    // Test data for PCD addition
-    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
-    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
-    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
-    let pcd_proof_index = 0;
-    let pcd_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
-    let (pcd_old_root, pcd_new_root) = MerkleTree::new(poseidon_hasher).calculate_two_roots(pcd_hash, pcd_proof_index, pcd_siblings);
-    // Test addition mode (is_adding_pcd = true)
-    main(
-        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
-        root, hash_path, indexes, pcd_hash, pcd_old_root, pcd_siblings, pcd_proof_index, true
-    );
-}
+//     // Test verification mode (is_adding_pcd = false)
+//     main(
+//         data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+//         root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
+//     );
+// }
 
-#[test(should_fail)]
-fn test_main_with_invalid_pcd() {
-    let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
+// #[test]
+// fn test_main_with_pcd_addition() {
+//     let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
 
-    // Test data for email verification
-    let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
-    let leaf: Field = hash(email_fields, LEAF_LIMBS);
-    let indexes = 0;
-    let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
-    let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+//     // Test data for email verification
+//     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+//     let leaf: Field = hash(email_fields, LEAF_LIMBS);
+//     let indexes = 0;
+//     let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+//     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
 
-    // Test data for PCD verification with invalid PCD
-    let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
-    let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
-    let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+//     // Test data for PCD addition
+//     let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+//     let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+//     let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+//     let pcd_proof_index = 0;
+//     let pcd_siblings: [Field; PCD_TREE_DEPTH] = [123; PCD_TREE_DEPTH];
+//     let (pcd_old_root, pcd_new_root) = MerkleTree::new(poseidon_hasher).calculate_two_roots(pcd_hash, pcd_proof_index, pcd_siblings);
+//     // Test addition mode (is_adding_pcd = true)
+//     main(
+//         data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+//         root, hash_path, indexes, pcd_hash, pcd_old_root, pcd_siblings, pcd_proof_index, true
+//     );
+// }
 
-    let different_pcd: BoundedVec<u8, 64> = BoundedVec::from_array("different_pcd".as_bytes());
-    let different_pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
-    let different_pcd_hash = hash(different_pcd_fields, LEAF_LIMBS);
-    let pcd_merkle_root = hash([different_pcd_hash, different_pcd_hash], 2);
-    let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [0; PCD_TREE_DEPTH];
-    let pcd_proof_index = 0;
+// #[test(should_fail)]
+// fn test_main_with_invalid_pcd() {
+//     let (pubkey_modulus_limbs, redc_params_limbs, signature_limbs, data, base64_decode_offset, expected_email) = get_test_data();
 
-    // This should fail because our pcd_hash doesn't match what's in the tree
-    main(
-        data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
-        root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
-    );
-}
+//     // Test data for email verification
+//     let email_fields: [Field; M] = boundedvec_to_fields(expected_email);
+//     let leaf: Field = hash(email_fields, LEAF_LIMBS);
+//     let indexes = 0;
+//     let hash_path: [Field; TREE_DEPTH] = [123; TREE_DEPTH];
+//     let root: Field = MerkleTree::new(poseidon_hasher).calculate_root(leaf, indexes, hash_path);
+
+//     // Test data for PCD verification with invalid PCD
+//     let pcd: BoundedVec<u8, 64> = BoundedVec::from_array("mock_pcd".as_bytes());
+//     let pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+//     let pcd_hash = hash(pcd_fields, LEAF_LIMBS);
+
+//     let different_pcd: BoundedVec<u8, 64> = BoundedVec::from_array("different_pcd".as_bytes());
+//     let different_pcd_fields: [Field; M] = boundedvec_to_fields(pcd);
+//     let different_pcd_hash = hash(different_pcd_fields, LEAF_LIMBS);
+//     let pcd_merkle_root = hash([different_pcd_hash, different_pcd_hash], 2);
+//     let pcd_proof_siblings: [Field; PCD_TREE_DEPTH] = [0; PCD_TREE_DEPTH];
+//     let pcd_proof_index = 0;
+
+//     // This should fail because our pcd_hash doesn't match what's in the tree
+//     main(
+//         data, base64_decode_offset, pubkey_modulus_limbs, redc_params_limbs, signature_limbs,
+//         root, hash_path, indexes, pcd_hash, pcd_merkle_root, pcd_proof_siblings, pcd_proof_index, false
+//     );
+// }
 
 // #[test]
 // fn test_other_inputs(){
