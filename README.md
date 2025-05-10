@@ -5,10 +5,10 @@
 ## 1. Current Implementation
 
 ### 1.1. Login + Set-Membership Proof (One-ZK Proof)
-- **Identity proof**  
+- **📧 Identity proof**  
   - User authenticates via OAuth2 (e.g. Google/Facebook)  
   - Client obtains a JWT, then converts it into a _zkJWT_ proof in Noir
-- **Group-membership proof**  
+- ** 🚦 Group-membership proof**  
   - User has a Semaphore identity (via zk-kit from PSE)  
   - Client generates a Semaphore membership proof in Noir
 - **Combined proof**  
@@ -24,6 +24,9 @@
 > - A fully working login flow with privacy-preserving group-access control, all in one proof.  
 > - No PCD storage yet—proofs live only on the user’s device and are sent directly to the verifier.
 
+### 🧪 1.2. Use cases
+
+While building this, we encounter ourselves at Zuitzerland
 ---
 
 ## 2. Next Step: PCD Storage
