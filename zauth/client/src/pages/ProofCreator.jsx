@@ -43,6 +43,8 @@ function ProofCreator() {
         
         setCircuitLoaded(true);
         console.log('Circuit loaded successfully');
+        console.log(backend)
+        
         setStatus('ready');
       } catch (err) {
         console.error('Error loading circuit:', err);
@@ -62,13 +64,19 @@ function ProofCreator() {
       try {
         const header = JSON.parse(atob(jwt.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
         const response = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+
+        console.log('Fetching Google public key...')
+        
         const jwks = await response.json();
         const key = jwks.keys.find(k => k.kid === header.kid);
         if (!key) throw new Error('Google public key not found for JWT');
         setPubkey(key);
+        console.log(key)
         
         // Set user email from JWT
         const decoded = jwtDecode(jwt);
+
+        console.log('JWT decoded:', decoded)
         setUserEmail(decoded.email);
       } catch (err) {
         console.error('Error fetching Google public key:', err);
@@ -121,6 +129,7 @@ function ProofCreator() {
       }
 
       const maxSignedDataLength = 910;
+
       const circuitInputs = await generateInputs({
         jwt,
         pubkey,
@@ -129,17 +138,23 @@ function ProofCreator() {
         proof_siblings: JSON.parse(inputs.proof_siblings),
         proof_index: Number(inputs.proof_index),
       });
+      console.log('Inputs generated')
+      console.log(circuitInputs)
 
       const { witness } = await noir.execute(circuitInputs);
       console.log('Witness generated');
+      console.log(witness)
 
       const proof = await backend.generateProof(witness);
+      console.log('Proof generated');
+      console.log(proof)
       const proofVerify = proof.proof
       const publicInputs = proof.publicInputs
 
       setProofVerify(proofVerify);
       setPublicInputs(publicInputs);
       setStatus('verifying');
+
       
       // Automatically verify the proof
       await handleVerifyProof(proofVerify, publicInputs);
@@ -167,6 +182,8 @@ function ProofCreator() {
         proofVerify: JSON.stringify(Array.from(proofToVerify)),
         publicInputs: JSON.stringify(inputsToVerify, null, 2)
       });
+
+      console.log('Verification result:', response.data)
 
       setVerificationResult({
         isValid: response.data.verified,
