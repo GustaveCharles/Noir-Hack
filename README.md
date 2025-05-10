@@ -59,6 +59,12 @@ Join us in making private, unlinkable, verifiable identity as easy as “login w
 
 ---
 
+
+
+https://github.com/user-attachments/assets/9382e71a-2b1f-4950-babf-cee6337d4aad
+
+
+
 ## Prerequisites
 
 - Node.js (v18 or higher)
