@@ -20,8 +20,8 @@ function Login() {
   }, []);
 
   const handleGoogleLogin = async () => {
-    const clientId = '604604729243-ghkjdvrngdbg6558jvki2maggsjtlfvh.apps.googleusercontent.com';
-    const redirectUri = 'http://localhost:5173/auth/callback';
+    const clientId = '244361761167-ehnko8odnv3o2i943kb0r9eb36plhm54.apps.googleusercontent.com';
+    const redirectUri = 'https://zauth-lilac.vercel.app/auth/callback';
     const scope = 'openid email profile';
     const finalNonce = nonce.trim() !== '' ? nonce : Math.random().toString(36).substring(2);
     
