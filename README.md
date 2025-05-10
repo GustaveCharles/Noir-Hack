@@ -146,6 +146,7 @@ A lightweight JSON blob the client generates and stores:
 
 ![Capture d’écran 2025-05-10 à 00 54 18](https://github.com/user-attachments/assets/fa73bb55-d5d4-43d1-bc30-1a102ac3bc37)
 
+We can see that the two most ressource intesive functions are the ones from the JWT library. It will be hard for us to bring this down, as it is an external library. We also note that our proving takes approximately 10 seconds. This is clearly above a usual Web2 UX experience, and thus we will explore alternative solutions for more comupte intensive proofs, like delegating to a coSNARK network, such as TACEO's. 
 
 
 ## 4. Next Actions
@@ -155,4 +156,3 @@ A lightweight JSON blob the client generates and stores:
 3. Update README with:  
    - Quickstart & usage examples  
    - Demo links / videos / deployed contracts  
-   - Notes on constraint counts, proving times & UX considerations 
