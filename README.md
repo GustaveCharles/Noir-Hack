@@ -142,6 +142,12 @@ A lightweight JSON blob the client generates and stores:
   - Maintain revocation Merkle roots  
   - Clients produce non-membership proofs to show a PCD hasn’t been revoked  
 
+## 4. Notes on constraint counts, proving times & UX considerations
+
+![Capture d’écran 2025-05-10 à 00 54 18](https://github.com/user-attachments/assets/fa73bb55-d5d4-43d1-bc30-1a102ac3bc37)
+
+
+
 ## 4. Next Actions
 
 1. Build client-side PCD generator & local database  
