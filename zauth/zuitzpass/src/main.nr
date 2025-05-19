@@ -40,9 +40,10 @@ fn main(
     pubkey_modulus_limbs: pub [u128; 18],
     redc_params_limbs: [u128; 18],
     signature_limbs: [u128; 18],
-    merkle_root: pub Field,
+    merkle_root: pub Field, //merkle tree for zuitzerland participants (prove membership) //TODO: rename
     proof_siblings: [Field; TREE_DEPTH], // sibling hashes
     proof_index: Field, // leaf index in the tree
+    //TODO: add nullifier tree: root, prove that you're not in using: email (in a second time: add salt (needs to think about how to always have the same salt and verify they cannot cheat)
 ) {
     let jwt = JWT::init(
         data,
